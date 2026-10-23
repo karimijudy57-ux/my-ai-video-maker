@@ -17,8 +17,8 @@ label{display:block;margin:16px 0 8px;font-weight:bold}
 textarea,select,input{width:100%;padding:13px;border-radius:10px;border:1px solid #65517b;background:#130f23;color:white;font-size:16px}
 textarea{min-height:120px;resize:vertical}
 button{border:0;border-radius:12px;padding:14px;background:linear-gradient(90deg,#ff65c5,#a779ff);color:#160d22;font-size:16px;font-weight:bold;cursor:pointer;width:100%;margin-top:16px}
-button:hover{opacity:.9}
-#status{margin-top:16px;line-height:1.6;color:#ffe0f5}
+button:disabled{opacity:.6;cursor:wait}
+#status{margin-top:16px;line-height:1.6;color:#ffe0f5;overflow-wrap:anywhere}
 #preview{width:100%;display:none;border-radius:12px;margin-top:15px}
 .small{font-size:13px;color:#c8badb;line-height:1.6}
 footer{text-align:center;color:#bcaaca;padding:25px}
@@ -32,8 +32,13 @@ footer{text-align:center;color:#bcaaca;padding:25px}
 <main>
 <div class="card">
 <h2>💗 Create your video</h2>
-<label for="prompt">Describe your video</label>
-<textarea id="prompt" placeholder="Example: Three adorable cartoon animals dancing in a magical garden, colorful 3D animation..."></textarea>
+
+<label for="prompt">Describe the movement you want</label>
+<textarea id="prompt" placeholder="A cute cartoon bunny waves, blinks, and dances in a magical garden..."></textarea>
+
+<label for="image">🖼️ Upload an image to animate</label>
+<input type="file" id="image" accept="image/*">
+<p class="small">Choose a picture of your character or scene. This generator animates an image rather than creating a whole scene from text alone.</p>
 
 <label for="style">🎨 Video style</label>
 <select id="style">
@@ -48,47 +53,194 @@ footer{text-align:center;color:#bcaaca;padding:25px}
 <select id="duration">
 <option value="5">5 seconds</option>
 <option value="10">10 seconds</option>
-<option value="15">15 seconds</option>
 </select>
 
-<button onclick="generate()">✨ Generate Video</button>
-<div id="status" role="status">💖 Your creative studio is ready!</div>
+<button id="generateButton" onclick="generate()">✨ Generate Video</button>
+<div id="status" role="status">💖 Upload an image and describe its movement to begin.</div>
 <video id="preview" controls playsinline></video>
+<a id="download" hidden download="dreamvid-video.mp4">Download your video</a>
 </div>
 
 <div class="card">
 <h3>🌟 Your AI video studio</h3>
-<p class="small">This is your own website interface. The Generate button currently checks your prompt; real AI video generation requires connecting an actual video model. We'll work on a free option next. No payment details needed.</p>
+<p class="small">DreamVid AI uses a public Hugging Face demo. It may be busy, unavailable, or limited by free usage quotas. This page does not contain a private API token. If the service blocks browser requests, a secure backend connection will be needed.</p>
 <button onclick="downloadPrompt()">📋 Save my video prompt</button>
 </div>
 </main>
 <footer>Made with 💖 by you | DreamVid AI 🎬</footer>
+
 <script>
-function generate(){
-const prompt=document.getElementById('prompt').value.trim();
-const style=document.getElementById('style').value;
-const duration=document.getElementById('duration').value;
-const status=document.getElementById('status');
-if(!prompt){
-status.textContent='💗 First, describe the video you want to create!';
-return;
+const API = "https://kulkas2pintu-wan777.hf.space";
+const $ = id => document.getElementById(id);
+
+function setStatus(message) {
+  $("status").textContent = message;
 }
-status.textContent='🎉 Your prompt is ready! Style: '+style+'. Length: '+duration+' seconds. The next step is connecting a video-generation model so this website can create a real moving video.';
+
+async function generate() {
+  const prompt = $("prompt").value.trim();
+  const file = $("image").files[0];
+  const style = $("style").value;
+  const duration = Number($("duration").value);
+  const button = $("generateButton");
+
+  if (!prompt) {
+    setStatus("💗 Please describe the movement first.");
+    return;
+  }
+  if (!file) {
+    setStatus("🖼️ Please choose an image to animate first.");
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    setStatus("Please select an image file.");
+    return;
+  }
+
+  button.disabled = true;
+  $("preview").style.display = "none";
+  $("download").hidden = true;
+  setStatus("⏳ Uploading your image. Keep this page open...");
+
+  try {
+    const uploadForm = new FormData();
+    uploadForm.append("files", file);
+
+    const uploadResponse = await fetch(API + "/gradio_api/upload", {
+      method: "POST",
+      body: uploadForm
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error("Image upload failed (HTTP " + uploadResponse.status + ").");
+    }
+
+    const uploaded = await uploadResponse.json();
+    const imagePath = Array.isArray(uploaded) ? uploaded[0] : null;
+
+    if (!imagePath) throw new Error("The service did not return an image path.");
+
+    const body = {
+      data: [
+        {path: imagePath, meta: { _type: "gradio.FileData" }},
+        null,
+        style + ". " + prompt,
+        4,
+        "text, subtitles, watermark, blurry, distorted anatomy, low quality",
+        duration,
+        1,
+        1,
+        Math.floor(Math.random() * 2147483647),
+        true,
+        6,
+        "UniPCMultistep",
+        3,
+        16,
+        true,
+        true
+      ]
+    };
+
+    setStatus("🎬 Image uploaded! Asking the AI to create your video...");
+
+    const startResponse = await fetch(API + "/gradio_api/call/generate_video", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    });
+
+    if (!startResponse.ok) {
+      throw new Error("The video service rejected the request (HTTP " + startResponse.status + ").");
+    }
+
+    const startData = await startResponse.json();
+    if (!startData.event_id) {
+      throw new Error("The service did not provide a generation job ID.");
+    }
+
+    setStatus("⏳ The AI is working. This can take several minutes...");
+
+    const resultResponse = await fetch(
+      API + "/gradio_api/call/generate_video/" + encodeURIComponent(startData.event_id)
+    );
+
+    if (!resultResponse.ok) {
+      throw new Error("Could not retrieve the result (HTTP " + resultResponse.status + ").");
+    }
+
+    const resultText = await resultResponse.text();
+    const lines = resultText.split("\n").filter(line => line.startsWith("data:"));
+    let result = null;
+
+    for (const line of lines.reverse()) {
+      try {
+        const parsed = JSON.parse(line.slice(5).trim());
+        if (Array.isArray(parsed) && parsed.length) {
+          result = parsed;
+          break;
+        }
+      } catch (_) {}
+    }
+
+    if (!result) {
+      throw new Error("The service did not return a readable video. Try again later.");
+    }
+
+    const videoItem = result.find(item =>
+      item && typeof item === "object" &&
+      (item.url || item.path) &&
+      (String(item.mime_type || "").startsWith("video/") ||
+       /\.(mp4|webm)(\?|$)/i.test(item.url || item.path))
+    );
+
+    if (!videoItem) {
+      throw new Error("The AI finished, but its video link was not found in the response.");
+    }
+
+    let videoUrl = videoItem.url;
+    if (!videoUrl && videoItem.path) {
+      videoUrl = API + "/gradio_api/file=" + encodeURIComponent(videoItem.path);
+    } else if (videoUrl && videoUrl.startsWith("/")) {
+      videoUrl = API + videoUrl;
+    }
+
+    $("preview").src = videoUrl;
+    $("preview").style.display = "block";
+    $("download").href = videoUrl;
+    $("download").hidden = false;
+    $("download").style.display = "inline-block";
+    $("download").style.marginTop = "16px";
+    $("download").style.color = "#ffb8e8";
+    $("download").textContent = "⬇️ Download your video";
+    setStatus("🎉 The service returned a video! Press play to check it.");
+  } catch (error) {
+    console.error(error);
+    setStatus("⚠️ We couldn't generate the video: " + error.message +
+      " If the browser blocks the connection or the demo requires authentication, we'll need a different connection method. No payment was made.");
+  } finally {
+    button.disabled = false;
+  }
 }
-function downloadPrompt(){
-const prompt=document.getElementById('prompt').value.trim();
-if(!prompt){
-document.getElementById('status').textContent='💗 Type your video idea first!';
-return;
-}
-const text='DreamVid AI video prompt\n\nIdea: '+prompt+'\nStyle: '+document.getElementById('style').value+'\nLength: '+document.getElementById('duration').value+' seconds';
-const blob=new Blob([text],{type:'text/plain'});
-const a=document.createElement('a');
-a.href=URL.createObjectURL(blob);
-a.download='my-video-prompt.txt';
-a.click();
-URL.revokeObjectURL(a.href);
-document.getElementById('status').textContent='💖 Your prompt has been saved!';
+
+function downloadPrompt() {
+  const prompt = $("prompt").value.trim();
+  if (!prompt) {
+    setStatus("💗 Type your video idea first!");
+    return;
+  }
+
+  const text = "DreamVid AI video prompt\n\nMovement: " + prompt +
+    "\nStyle: " + $("style").value +
+    "\nLength: " + $("duration").value + " seconds";
+
+  const blob = new Blob([text], {type: "text/plain"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "my-video-prompt.txt";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus("💖 Your prompt has been saved!");
 }
 </script>
 </body>
