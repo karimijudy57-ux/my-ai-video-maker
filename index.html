@@ -150,7 +150,8 @@ $("generate").addEventListener("click", async () => {
       return null;
     }
 
-    const videoUrl = findVideo(videoOutput);
+  console.log("DreamVid full API result:", result.data);
+    const videoUrl = findVideo(data);
 
     if (!videoUrl) {
       console.error("Unexpected video result:", data);
