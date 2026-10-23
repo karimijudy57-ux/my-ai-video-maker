@@ -1,0 +1,95 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DreamVid AI 🎬</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#100d20;color:white}
+header{text-align:center;padding:25px 15px;background:#201438}
+header h1{color:#ff8ad8;margin:0 0 8px}
+header p{color:#d9cbe8;margin:0}
+main{max-width:760px;margin:25px auto;padding:20px}
+.card{background:#211a35;padding:22px;border-radius:20px;margin-bottom:20px;border:1px solid #49345f}
+label{display:block;margin:16px 0 8px;font-weight:bold}
+textarea,select,input{width:100%;padding:13px;border-radius:10px;border:1px solid #65517b;background:#130f23;color:white;font-size:16px}
+textarea{min-height:120px;resize:vertical}
+button{border:0;border-radius:12px;padding:14px;background:linear-gradient(90deg,#ff65c5,#a779ff);color:#160d22;font-size:16px;font-weight:bold;cursor:pointer;width:100%;margin-top:16px}
+button:hover{opacity:.9}
+#status{margin-top:16px;line-height:1.6;color:#ffe0f5}
+#preview{width:100%;display:none;border-radius:12px;margin-top:15px}
+.small{font-size:13px;color:#c8badb;line-height:1.6}
+footer{text-align:center;color:#bcaaca;padding:25px}
+</style>
+</head>
+<body>
+<header>
+<h1>✨ DreamVid AI 🎬</h1>
+<p>Turn your imagination into amazing videos 💖</p>
+</header>
+<main>
+<div class="card">
+<h2>💗 Create your video</h2>
+<label for="prompt">Describe your video</label>
+<textarea id="prompt" placeholder="Example: Three adorable cartoon animals dancing in a magical garden, colorful 3D animation..."></textarea>
+
+<label for="style">🎨 Video style</label>
+<select id="style">
+<option>3D Cartoon Animation</option>
+<option>Anime</option>
+<option>Storybook</option>
+<option>Realistic</option>
+<option>Clay Animation</option>
+</select>
+
+<label for="duration">⏱️ Video length</label>
+<select id="duration">
+<option value="5">5 seconds</option>
+<option value="10">10 seconds</option>
+<option value="15">15 seconds</option>
+</select>
+
+<button onclick="generate()">✨ Generate Video</button>
+<div id="status" role="status">💖 Your creative studio is ready!</div>
+<video id="preview" controls playsinline></video>
+</div>
+
+<div class="card">
+<h3>🌟 Your AI video studio</h3>
+<p class="small">This is your own website interface. The Generate button currently checks your prompt; real AI video generation requires connecting an actual video model. We'll work on a free option next. No payment details needed.</p>
+<button onclick="downloadPrompt()">📋 Save my video prompt</button>
+</div>
+</main>
+<footer>Made with 💖 by you | DreamVid AI 🎬</footer>
+<script>
+function generate(){
+const prompt=document.getElementById('prompt').value.trim();
+const style=document.getElementById('style').value;
+const duration=document.getElementById('duration').value;
+const status=document.getElementById('status');
+if(!prompt){
+status.textContent='💗 First, describe the video you want to create!';
+return;
+}
+status.textContent='🎉 Your prompt is ready! Style: '+style+'. Length: '+duration+' seconds. The next step is connecting a video-generation model so this website can create a real moving video.';
+}
+function downloadPrompt(){
+const prompt=document.getElementById('prompt').value.trim();
+if(!prompt){
+document.getElementById('status').textContent='💗 Type your video idea first!';
+return;
+}
+const text='DreamVid AI video prompt\n\nIdea: '+prompt+'\nStyle: '+document.getElementById('style').value+'\nLength: '+document.getElementById('duration').value+' seconds';
+const blob=new Blob([text],{type:'text/plain'});
+const a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download='my-video-prompt.txt';
+a.click();
+URL.revokeObjectURL(a.href);
+document.getElementById('status').textContent='💖 Your prompt has been saved!';
+}
+</script>
+</body>
+</html>
